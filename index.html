@@ -1,0 +1,409 @@
+<html>
+	<head>
+		<title>Lorcana Sealed Deck Generator</title>
+		<style>
+			/* Original Source taken from @ffsmusher :: https://codepen.io/ffsmusher/pen/YzdMdwJ */
+
+body{
+  margin-bottom:200px;
+}
+#cards{
+  display: grid;
+  grid-gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+#cards img{
+  width:100%;
+}
+.card{
+  overflow: hidden;
+  position: relative;
+  border-radius: 15px;
+  cursor:pointer;
+}
+.card:not([active]) span{
+    opacity:75%;
+    z-index: 5;
+    height: 100%;
+    width: 100%;
+    content: '';
+    position: absolute;
+    top: 0;
+    background-color: black;
+    left: 0;
+}
+#popup{
+    transform: translateX(-50%);
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    max-width: 90%;
+    background-color: #ffe7cb;
+    padding: 50px 20px 30px;
+    box-shadow: 0px 3px 9px rgba(0,0,0,.5);
+    border-radius: 12px;
+    z-index:6;
+}
+#exportCode {
+    display: block;
+    overflow-wrap: break-word;
+}
+#popup-close {
+    font-size: 20px;
+    font-weight: bold;
+    font-family: sans-serif;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    cursor:pointer;
+}
+#popup.hidden{
+  display:none;
+}
+#buttons{
+    background-color: white;
+    z-index: 6;
+    position: fixed;
+    text-align: center;
+    bottom: 0px;
+    width: 100%;
+    display:flex;
+    gap:20px;
+    justify-content: center;
+}
+#buttons button {
+    color: white;
+    font-weight: bold;
+    font-family: sans-serif;
+    margin: 20px 0px;
+    border: none;
+    background-color: #818181;
+    padding: 10px 30px;
+    cursor:pointer;
+}
+#totalCards{
+  order: 76;
+}
+		</style>
+
+
+	</head>
+	<body>
+	  
+		
+	<div id="buttons">
+		<h2 id="totalCards"></h2>
+		<button id="genPool">Get Set Pool</button>
+		<button id="genPack">Generate Sealed Deck Pool</button>
+	</div>
+	<div id="popup" class="hidden"><span id="popup-close">X</span><p id='exportCode'></p></div>
+	<div id="cards"></div>
+  
+		<script>
+			// Original Source taken from @ffsmusher :: https://codepen.io/ffsmusher/pen/YzdMdwJ
+			var commons = [];
+			var uncommons = [];
+			var rares = [];
+			var suprares = [];
+			var legends = [];
+			var cardContainer = document.querySelector('#cards');
+			var genPackButton = document.querySelector('#genPack');
+			var genPoolButton = document.querySelector('#genPool');
+			var buttonContainer = document.querySelector('#buttons');
+			
+			// Initialize empty arrays for each color
+			const Amber = [];
+			const Amethyst = [];
+			const Emerald = [];
+			const Ruby = [];
+			const Sapphire = [];
+			const Steel = [];
+
+			/**
+			 * Get Cards from Api and store into respective rarity arrays
+			 */
+			genPoolButton.addEventListener('click', (e) => {
+			(async() => {
+				let json = await fetch('https://api.lorcana-api.com/cards/fetch?search=Set_Num=3');
+				let data = await json.json();
+				let queryString = '';
+				let totalCards = 0;
+				data.forEach(card => {
+				queryString += encodeURIComponent(card.Name.trim())+';';
+				//queryString = queryString.replace(/'/g, '%27')
+				totalCards++;
+				});
+				console.log(totalCards);
+				let json2 = await fetch('https://api.lorcana-api.com/cards/fetch?strict='+queryString);
+				let data2 = await json2.json();
+				commons = data2.filter(card => {
+				return card.Rarity === 'Common';
+				});
+				uncommons = data2.filter(card => {
+				return card.Rarity === 'Uncommon';
+				});
+				rares = data2.filter(card => {
+				return card.Rarity === 'Rare';
+				});
+				suprares = data2.filter(card => {
+				return card.Rarity === 'Super Rare';
+				});
+				legends = data2.filter(card => {
+				return card.Rarity === 'Legendary';
+				});
+			})()
+			})
+
+
+			/**
+			 * On click the generate sealed pool will
+			 * 1. Clear the card container
+			 * 2. Create an array with cards from 6 packs
+			 * 3. Update the total number of Cards in Active Deck
+			 * 4. Generate Pixelborn Export Button for Deck
+			 */
+			genPackButton.addEventListener('click', (e) => {
+			cardContainer.innerHTML = '';
+			Array.from(Array(6), () => { genPack() });
+			updateTotal();
+			pixelbornExportButton();
+			inkSortButton();
+			raritySortButton();
+			})
+
+			genPoolButton.addEventListener('click', (e) => {
+			
+			})
+
+			/**
+			 * returns card data for a card that could be in the foil slot of a pack
+			 *
+			 * @param {array} pack Current Pack Array, used to prevent duplicates and too many legendaries
+			 * @return {object} single card data
+			 */
+			function genFoil(pack){
+			let rand = Math.floor(Math.random() * 200) + 1;
+			switch(true){
+				case rand < 25:
+				return genRare(pack);
+				case rand < 100:
+				return genCard(uncommons);
+				default:
+				return genCard(commons);
+			}
+			}
+			/**
+			 * returns card data for a card that could be in the rare slot of a pack
+			 *
+			 * @param {array} pack Current Pack Array, used to prevent duplicates and too many legendaries
+			 * @return {object} single card data
+			 */
+			function genRare(pack){
+			let rand = Math.floor(Math.random() * 200) + 1;
+			switch(true){
+				case rand < 17 && pack[pack.length-1].rarity != 'Legendary':
+				return genCard(legends);
+				case rand < 50:
+				return genCard(suprares);
+				default:
+				return genCard(rares);
+			}
+			}
+
+			/**
+			 * returns card data for a card that could be in any slot of a pack
+			 *
+			 * @param {array} rarity Array of cards of a specific rarity
+			 * @return {object} single card data
+			 */
+			function genCard(rarity){
+			let card = rarity[Math.floor(Math.random()*rarity.length)];
+			let subtitle = card.subtitle || '';
+			card.pbID = card.Name+'_'+subtitle+'$1|';
+			return card;
+			}
+
+			function genCommon(color){{
+				let card = color[Math.floor(Math.random()*color.length)];
+				let subtitle = card.subtitle || '';
+				card.pbID = card.Name+'_'+subtitle+'$1|';
+				return card;
+			}}
+
+			/**
+			 * return an array of 12 cards simulating a lorcana pack
+			 *
+			 * @return {array} array of 12 card objects
+			 */
+			function genPack(){
+			let pack = [];
+			
+			sortCommons(commons);
+			
+			pack.push(genCommon(Amber));
+			pack.push(genCommon(Amethyst));
+			pack.push(genCommon(Emerald));
+			pack.push(genCommon(Ruby));
+			pack.push(genCommon(Sapphire));
+			pack.push(genCommon(Steel));
+
+			Array.from(Array(3), () => { pack.push(genCard(uncommons)); });
+			Array.from(Array(2), () => { pack.push(genRare(pack)); });
+			pack.push(genFoil(pack));
+			
+			pack.forEach(card => {
+				let cardImg = document.createElement('img');
+				let cardImgContainer = document.createElement('div');
+				let cardImgOverlay = document.createElement('span');
+				cardImg.src = card['Image'];
+				cardImgContainer.classList.add('card');
+				cardImgContainer.setAttribute('pbID', card.pbID);
+				cardImgContainer.setAttribute('inkCost', card.Cost);
+				cardImgContainer.setAttribute('rarity', card.Rarity);
+				cardImgContainer.toggleAttribute('active');
+				cardImgContainer.addEventListener('click', (e)=>{
+				e.currentTarget.toggleAttribute('active');
+				updateTotal();
+				})
+				cardImgContainer.append(cardImg);
+				cardImgContainer.append(cardImgOverlay);
+				cardContainer.append(cardImgContainer);
+			})
+			return pack;
+			}
+
+			/**
+			 * returns a base64 encoded pixelborn string from active cards
+			 *
+			 * @return {string} pixelborn import
+			 */
+			function poolToPixelborn(){
+			let cards = document.querySelectorAll('.card[active]');
+			let deckString = '';
+			cards.forEach(card => {
+				deckString += card.getAttribute('pbID');
+			})
+			return btoa(deckString);
+			}
+
+			/**
+			 * Creates button to export pixelborn code
+			 *
+			 */
+			function pixelbornExportButton(){
+			let exportButton = document.querySelector('#pixelBornExportButton');
+			let popup = document.querySelector('#popup');
+			let popupExportCode = document.querySelector('#exportCode');
+			let popupClose = document.querySelector('#popup-close');
+			if (exportButton){ return; }
+			exportButton = document.createElement('button');
+			exportButton.id = 'pixelBornExportButton';
+			exportButton.innerText = 'Export to Pixelborn';
+			exportButton.addEventListener('click', (e) => {
+				popupExportCode.innerText = poolToPixelborn();
+				popup.classList.toggle('hidden');
+			})
+			popupClose.addEventListener('click', (e) =>{
+				popup.classList.toggle('hidden');
+			})
+			buttonContainer.append(exportButton);
+			}
+
+			/**
+			 * Updates total card count in deck and displays it
+			 *
+			 */
+			function updateTotal(){
+			let cards = document.querySelectorAll('.card[active]');
+			let totalCounter = document.querySelector('#totalCards');
+			totalCounter.innerText = 'Total Cards : '+cards.length;
+			}
+
+			function sortByInk(){
+			let cards = document.querySelectorAll('.card');
+			let cardsArray = [].slice.call(cards).sort((carda, cardb)=>{
+				return carda.getAttribute('inkCost') > cardb.getAttribute('inkCost') ? 1 : -1;
+			})
+			cardsArray.forEach(function (p) {
+				cardContainer.appendChild(p);
+			});
+			}
+
+			function sortByRarity(){
+			const priority = ['Common', 'Uncommon', 'Rare', 'Super Rare', 'Legendary'];
+			let cards = document.querySelectorAll('.card');
+			let cardsArray = [].slice.call(cards).sort((carda, cardb)=> {
+				return priority.indexOf(carda.getAttribute('rarity')) > priority.indexOf(cardb.getAttribute('rarity')) ? 1 : -1;
+			})
+			cardsArray.forEach(function (p) {
+				cardContainer.appendChild(p);
+			});
+			}
+
+			function inkSortButton(){
+			let inkSortButton = document.querySelector('#inkSortButton');
+			if (inkSortButton){ return; }
+			inkSortButton = document.createElement('button');
+			inkSortButton.id = 'inkSortButton';
+			inkSortButton.innerText = 'Sort by Ink Cost';
+			inkSortButton.addEventListener('click', (e) => {
+				sortByInk();
+			})
+			buttonContainer.append(inkSortButton);
+			}
+
+			function raritySortButton(){
+			let raritySortButton = document.querySelector('#raritySortButton');
+			if (raritySortButton){ return; }
+			raritySortButton = document.createElement('button');
+			raritySortButton.id = 'raritySortButton';
+			raritySortButton.innerText = 'Sort by Rarity';
+			raritySortButton.addEventListener('click', (e) => {
+				sortByRarity();
+			})
+			buttonContainer.append(raritySortButton);
+			}
+
+
+			function sortCommons(commonCards){
+
+
+				// Sort cards into respective color arrays
+				commonCards.forEach(card => {
+				switch (card.Color) {
+					case 'Amber':
+					Amber.push(card);
+					break;
+					case 'Amethyst':
+					Amethyst.push(card);
+					break;
+					case 'Emerald':
+					Emerald.push(card);
+					break;
+					case 'Ruby':
+					Ruby.push(card);
+					break;
+					case 'Sapphire':
+					Sapphire.push(card);
+					break;
+					case 'Steel':
+					Steel.push(card);
+					break;
+					default:
+					break;
+				}
+				});
+
+				// Now, you have sorted cards in arrays named after their colors
+				console.log('Amber:', Amber);
+				console.log('Amethyst:', Amethyst);
+				console.log('Emerald:', Emerald);
+				console.log('Ruby:', Ruby);
+				console.log('Sapphire:', Sapphire);
+				console.log('Steel:', Steel);
+			}
+
+		</script>
+
+	</body>
+</html>
