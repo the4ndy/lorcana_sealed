@@ -258,11 +258,13 @@ body{
 				return card;
 			}}
 
+
 			function processString(input) {
 				// Check if the input string contains a "-"
-				if (input.includes(' - ')) {
-					// Use regular expression to replace space before and after "-" with "_"
-					return input.replace(/\s*-\s*/g, '_');
+				const index = input.indexOf(' - ');
+				if (index !== -1) {
+					// Replace space before and after "-" with "_"
+					return input.substring(0, index) + '_' + input.substring(index + 3);
 				}
 				// Return the input string as is if no changes are needed
 				return input;
